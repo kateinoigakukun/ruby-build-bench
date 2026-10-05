@@ -11,6 +11,9 @@ on:
       platforms:
         description: which jobs run (unix, windows)
         default: unix windows
+      jits:
+        description: JIT settings on Unix
+        default: nojit yjit
 permissions:
   contents: read
 jobs:
@@ -39,7 +42,7 @@ jobs:
       - name: bench
         run: |
           J=$(nproc 2>/dev/null || sysctl -n hw.ncpu)
-          scripts/bench.sh $RUNNER_TEMP/w $J ${{ inputs.reps }} "nojit yjit" | tee $RUNNER_TEMP/w/results.txt
+          scripts/bench.sh $RUNNER_TEMP/w $J ${{ inputs.reps }} "${{ inputs.jits }}" | tee $RUNNER_TEMP/w/results.txt
       - name: results
         if: always()
         run: |
