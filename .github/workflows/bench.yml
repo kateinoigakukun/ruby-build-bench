@@ -1,0 +1,111 @@
+name: bench
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release whose baseline.tar.gz and candidate.tar.gz are built
+        default: inputs-1
+      reps:
+        description: builds of each tarball (alternating order)
+        default: "3"
+permissions:
+  contents: read
+jobs:
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libyaml-dev zlib1g-dev libffi-dev libgmp-dev
+      - name: machine
+        run: |
+          uname -a; (nproc || sysctl -n hw.ncpu); cc --version | head -1; rustc --version || true
+      - name: tarballs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p $RUNNER_TEMP/w
+          gh release download "${{ inputs.tag }}" -D $RUNNER_TEMP/w -p 'baseline.tar.gz' -p 'candidate.tar.gz'
+      - name: bench
+        run: |
+          J=$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          scripts/bench.sh $RUNNER_TEMP/w $J ${{ inputs.reps }} "nojit yjit" | tee $RUNNER_TEMP/w/results.txt
+      - name: results
+        if: always()
+        run: |
+          mkdir -p out/${{ matrix.os }}; cp $RUNNER_TEMP/w/results.txt out/${{ matrix.os }}/ || true
+          python3 scripts/summary.py out/*/results.txt >> $GITHUB_STEP_SUMMARY || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.os }}
+          path: |
+            out/${{ matrix.os }}/results.txt
+            ${{ runner.temp }}/w/logs
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: tarballs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/w"
+          gh release download "${{ inputs.tag }}" -D "$RUNNER_TEMP/w" -p 'baseline.tar.gz' -p 'candidate.tar.gz'
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\w\vcpkg\vcpkg_installed
+          key: vcpkg-${{ hashFiles('vcpkg/vcpkg.json') }}-windows-2022
+      - name: libraries (vcpkg)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\w\vcpkg" | Out-Null
+          Copy-Item vcpkg\vcpkg.json "$env:RUNNER_TEMP\w\vcpkg\"
+          Push-Location "$env:RUNNER_TEMP\w\vcpkg"
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install --triplet x64-windows
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Pop-Location
+      - name: machine
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
+      - name: bench
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $env:VCVARS = "$vs\VC\Auxiliary\Build\vcvars64.bat"
+          & scripts\bench-win.ps1 -Work "$env:RUNNER_TEMP\w" -Reps ${{ inputs.reps }} | Tee-Object -FilePath "$env:RUNNER_TEMP\w\results.txt"
+      - name: results
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out/windows-2022; cp "$RUNNER_TEMP/w/results.txt" out/windows-2022/ || true
+          python scripts/summary.py out/*/results.txt >> $GITHUB_STEP_SUMMARY || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-2022
+          path: |
+            out/windows-2022/results.txt
+            ${{ runner.temp }}\w\logs
+  summary:
+    needs: [unix, windows]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+      - run: |
+          ls out
+          for d in out/*/; do f=$(find "$d" -name results.txt | head -1); [ -n "$f" ] && mkdir -p r/$(basename $d) && cp "$f" r/$(basename $d)/; done
+          python3 scripts/summary.py r/*/results.txt | tee -a $GITHUB_STEP_SUMMARY

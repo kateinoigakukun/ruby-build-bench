@@ -1,0 +1,3 @@
+{
+  "dependencies": ["gmp", "libffi", "libyaml", "openssl", "zlib"]
+}
