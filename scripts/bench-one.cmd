@@ -1,6 +1,6 @@
 @echo off
 :: bench-one.cmd VARIANT WORK: a fresh tree WORK\b-VARIANT from WORK\VARIANT.tar.gz, then configure
-:: (win32\configure.bat for baseline, configure.bat for candidate), nmake prepare-vcpkg, nmake and
+:: (configure.bat when the tarball has one at its top, else win32\configure.bat), nmake prepare-vcpkg, nmake and
 :: nmake install DESTDIR=, each between MARK lines
 setlocal
 set "V=%~1"
@@ -20,7 +20,7 @@ mklink /J "%BLD%\vcpkg_installed" "%W%\vcpkg\vcpkg_installed" > nul || exit /b 1
 cd /d "%BLD%" || exit /b 1
 set "OPTS=--disable-install-doc --disable-yjit --disable-zjit --with-opt-dir=%BLD:\=/%/vcpkg_installed/x64-windows --with-gmp"
 echo MARK configure %TIME%
-if "%V%" == "baseline" (call win32\configure.bat %OPTS% --without-baseruby > %W%\logs\%V%-configure.log 2>&1) else (call configure.bat %OPTS% > %W%\logs\%V%-configure.log 2>&1)
+if exist configure.bat (call configure.bat %OPTS% > %W%\logs\%V%-configure.log 2>&1) else (call win32\configure.bat %OPTS% --without-baseruby > %W%\logs\%V%-configure.log 2>&1)
 if not exist Makefile (echo FAILED configure & exit /b 1)
 echo MARK vcpkg %TIME%
 nmake prepare-vcpkg > %W%\logs\%V%-vcpkg.log 2>&1 || (echo FAILED vcpkg & exit /b 1)

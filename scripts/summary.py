@@ -16,7 +16,7 @@ print("| runner | jit | variant | builds | configure | make | install | total | 
 print("|---|---|---|---|---|---|---|---|---|")
 for (runner, jit) in sorted({(r, j) for r, j, _ in rows}):
     tot = {}
-    for v in ("baseline", "candidate"):
+    for v in sorted({v for r, j, v in rows if (r, j) == (runner, jit)}, key=lambda v: (v != "baseline", v)):
         ok = [x for x in rows.get((runner, jit, v), []) if x]
         n = len(rows.get((runner, jit, v), []))
         if not ok:
@@ -24,5 +24,5 @@ for (runner, jit) in sorted({(r, j) for r, j, _ in rows}):
             continue
         med = [statistics.median(x[k] for x in ok) for k in range(3)]
         tot[v] = statistics.median(sum(x) for x in ok)
-        sp = f"{tot['baseline'] / tot[v]:.2f}x" if v == "candidate" and "baseline" in tot else ""
+        sp = f"{tot['baseline'] / tot[v]:.2f}x" if v != "baseline" and "baseline" in tot else ""
         print(f"| {runner} | {jit} | {v} | {len(ok)}/{n} | {med[0]:.1f} | {med[1]:.1f} | {med[2]:.1f} | {tot[v]:.1f} | {sp} |")

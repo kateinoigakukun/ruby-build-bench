@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: release whose baseline.tar.gz and candidate.tar.gz are built
+        description: release whose *.tar.gz are built (speedups relative to baseline.tar.gz)
         default: inputs-1
       reps:
         description: builds of each tarball (alternating order)
@@ -35,7 +35,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p $RUNNER_TEMP/w
-          gh release download "${{ inputs.tag }}" -D $RUNNER_TEMP/w -p 'baseline.tar.gz' -p 'candidate.tar.gz'
+          gh release download "${{ inputs.tag }}" -D $RUNNER_TEMP/w -p '*.tar.gz'
       - name: bench
         run: |
           J=$(nproc 2>/dev/null || sysctl -n hw.ncpu)
@@ -64,7 +64,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/w"
-          gh release download "${{ inputs.tag }}" -D "$RUNNER_TEMP/w" -p 'baseline.tar.gz' -p 'candidate.tar.gz'
+          gh release download "${{ inputs.tag }}" -D "$RUNNER_TEMP/w" -p '*.tar.gz'
       - uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}\w\vcpkg\vcpkg_installed

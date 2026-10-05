@@ -1,7 +1,7 @@
 #!/bin/bash
 # bench.sh WORK JOBS REPS JITS: cold `./configure && make -jJOBS && make install DESTDIR=` of
-# baseline.tar.gz and candidate.tar.gz (in WORK), REPS times with the order alternating, for each
-# of JITS ("nojit yjit"); no ruby, git or compiler cache on PATH.
+# each VARIANT.tar.gz in WORK, REPS times with the order rotating, for each of JITS
+# ("nojit yjit"); no ruby, git or compiler cache on PATH.
 # One line per build: VARIANT JIT REP configure_s make_s install_s rc
 W=$1; J=$2; REPS=$3; JITS=$4
 cd $W || exit 1
@@ -34,7 +34,8 @@ run() { # VARIANT JIT REP
   cd $W; rm -rf $d
 }
 mkdir -p $W/logs
+VARIANTS=$(cd $W && ls *.tar.gz | sed 's/\.tar\.gz$//' | sort)
 for rep in $(seq 1 $REPS); do
-  if [ $((rep % 2)) = 1 ]; then order="baseline candidate"; else order="candidate baseline"; fi
+  order=$(echo $VARIANTS | tr ' ' '\n' | awk -v r=$rep '{a[NR]=$0} END {for (i = 0; i < NR; i++) print a[(i + r - 1) % NR + 1]}')
   for jit in $JITS; do for v in $order; do run $v $jit $rep; done; done
 done
