@@ -8,10 +8,14 @@ on:
       reps:
         description: builds of each tarball (alternating order)
         default: "3"
+      platforms:
+        description: which jobs run (unix, windows)
+        default: unix windows
 permissions:
   contents: read
 jobs:
   unix:
+    if: contains(inputs.platforms, 'unix')
     strategy:
       fail-fast: false
       matrix:
@@ -49,6 +53,7 @@ jobs:
             out/${{ matrix.os }}/results.txt
             ${{ runner.temp }}/w/logs
   windows:
+    if: contains(inputs.platforms, 'windows')
     runs-on: windows-2022
     timeout-minutes: 360
     steps:
@@ -98,7 +103,7 @@ jobs:
             ${{ runner.temp }}\w\logs
   summary:
     needs: [unix, windows]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

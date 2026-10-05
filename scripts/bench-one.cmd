@@ -10,7 +10,8 @@ set "PATH=%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SystemR
 call "%VCVARS%" > nul || exit /b 1
 set MAKEFLAGS=
 set MFLAGS=
-where sh.exe bash.exe ruby.exe git.exe 2>nul && (echo sh/bash/ruby/git found on PATH & exit /b 1)
+:: (System32\bash.exe, the WSL launcher, may be there: not a shell the build can use)
+where sh.exe ruby.exe git.exe 2>nul && (echo sh/ruby/git found on PATH & exit /b 1)
 if exist "%BLD%" rd /s /q "%BLD%"
 if exist "%BLD%-dest" rd /s /q "%BLD%-dest"
 mkdir "%BLD%" || exit /b 1
